@@ -16,6 +16,8 @@ import argparse
 hw_dir = os.path.dirname(os.path.abspath(__file__))
 assets_dir = os.path.join(hw_dir, 'assets')
 
+print(f'Assets dir: {assets_dir}')
+
 
 BOX_SIZE = 0.1
 
