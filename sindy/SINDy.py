@@ -6,6 +6,8 @@ import tqdm
 from torch.autograd.functional import jvp
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+from utils.mppi import MPPI
+from utils.panda_pushing_env import TARGET_POSE_FREE, TARGET_POSE_OBSTACLES, OBSTACLE_HALFDIMS, OBSTACLE_CENTRE, BOX_SIZE
 
 class NormalizationTransform:
     def __init__(self, norm_constants, eps=1e-8):
@@ -202,6 +204,142 @@ class RoboSINDy(nn.Module):
                 mask = torch.abs(self.xi_coefficients) > 0.1
                 self.xi_coefficients.data *= mask.float()
                 print(f"Epoch {epoch}/{num_epochs}, Loss: {loss.item()}")
+
+def img_space_pushing_cost_function(state, action, target_state):
+    """
+    Compute the state cost for MPPI on a setup without obstacles in state space (images).
+    :param state: torch tensor of shape (B, num_channels, w, h)
+    :param action: torch tensor of shape (B, action_size)
+    :param target_state: torch tensor of shape (num_channels, w, h)
+    :return: cost: torch tensor of shape (B,) containing the costs for each of the provided states
+    """
+    cost = None
+    # --- Your code here
+
+    cost = torch.mean((state - target_state.unsqueeze(0))**2, dim=(1,2,3))
+
+    # ---
+    return cost
+
+
+class PushingImgSpaceController(object):
+    """
+    MPPI-based controller
+    Since you implemented MPPI on HW2, here we will give you the MPPI implementation.
+    You will just need to implement the dynamics and tune the hyperparameters and cost functions.
+    """
+
+    def __init__(self, env, model, cost_function, norm_constants, num_samples=100, horizon=10):
+        self.env = env
+        self.model = model
+        self.norm_constants = norm_constants
+        self.target_state = torch.as_tensor(self.env.get_target_state(), dtype=torch.float32).permute(2, 0, 1)
+        self.target_state_norm = (self.target_state - self.norm_constants['mean_state']) / self.norm_constants['std_state']
+        self.cost_function = cost_function
+        # MPPI Hyperparameters:
+        # --- You may need to tune them
+        state_dim = env.observation_space.shape[0]
+        u_min = torch.from_numpy(env.action_space.low)
+        u_max = torch.from_numpy(env.action_space.high)
+        noise_sigma = 0.1 * torch.eye(env.action_space.shape[0])
+        lambda_value = 0.01
+        # ---
+        self.mppi = MPPI(self._compute_dynamics,
+                         self._compute_costs,
+                         nx=state_dim,
+                         num_samples=num_samples,
+                         horizon=horizon,
+                         noise_sigma=noise_sigma,
+                         lambda_=lambda_value,
+                         u_min=u_min,
+                         u_max=u_max)
+
+    def _compute_dynamics(self, state, action):
+        """
+        Compute next_state using the dynamics model self.model and the provided state and action tensors
+        :param state: torch tensor of shape (B, wrapped_state_size)
+        :param action: torch tensor of shape (B, action_size)
+        :return: next_state: torch tensor of shape (B, wrapped_state_size) containing the predicted states from the learned model.
+        """
+        next_state = None
+        # --- Your code here
+
+        x = self._wrap_state(state)
+        
+        z = self.model.encoder(x)
+        theta_z = self.model.compute_theta(z)
+        z_dot_pred = theta_z @ self.model.xi_coefficients
+        z_next = z + (z_dot_pred / 240.0)
+        next_state = self.model.decoder(z_next)
+
+        # ---
+        return next_state
+
+    def _compute_costs(self, state, action):
+        """
+        Compute the cost for each state-action pair.
+        You need to call self.cost_function to compute the cost.
+        :param state: torch tensor of shape (B, wrapped_state_size)
+        :param action: torch tensor of shape (B, action_size)
+        :return: cost: torch tensor of shape (B,) containing the costs for each of the provided states
+        """
+        cost = None
+        # --- Your code here
+
+        state = self._unwrap_state(state)
+        cost = self.cost_function(state, action, self.target_state_norm)
+
+        # ---
+        return cost
+
+    def control(self, state):
+        """
+        Query MPPI and return the optimal action given the current state <state>
+        :param state: numpy array of shape (height, width, num_channels) representing current state
+        :return: action: numpy array of shape (action_size,) representing optimal action to be sent to the robot.
+        TO DO:
+         - Prepare the state so it can be sent to the mppi controller. Note that MPPI works with torch tensors.
+         - You may need to normalize the state to the same space used for training the model.
+         - Unpack the mppi returned action to the desired format.
+        """
+        action = None
+        state_tensor = None
+        # --- Your code here
+
+        state_tensor = torch.tensor(state, dtype=torch.float32).permute(2, 0, 1)
+        state_tensor = (state_tensor - self.norm_constants['mean_state']) / self.norm_constants['std_state']
+
+        # ---
+        action_tensor = self.mppi.command(state_tensor)
+        # --- Your code here
+
+
+        action = action_tensor.detach().numpy()
+
+
+        # ---
+        return action
+
+    def _wrap_state(self, state):
+        # convert state from shape (..., num_channels, height, width) to shape (..., num_channels*height*width)
+        wrapped_state = None
+        # --- Your code here
+
+        wrapped_state = state.reshape(-1, self.target_state.shape[0] * self.target_state.shape[1] * self.target_state.shape[2])
+
+        # ---
+        return wrapped_state
+
+    def _unwrap_state(self, wrapped_state):
+        # convert state from shape (..., num_channels*height*width) to shape (..., num_channels, height, width)
+        state = None
+        # --- Your code here
+
+        state = wrapped_state.reshape(-1, self.target_state.shape[0], self.target_state.shape[1], self.target_state.shape[2])
+
+
+        # ---
+        return state
 
 
 
