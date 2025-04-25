@@ -267,10 +267,19 @@ class PushingImgSpaceController(object):
         x = self._wrap_state(state)
         
         z = self.model.encoder(x)
-        theta_z = self.model.compute_theta(z)
-        z_dot_pred = theta_z @ self.model.xi_coefficients
-        z_next = z + (z_dot_pred / 240.0)
+
+        # SINDy dynamics
+        # theta_z = self.model.compute_theta(z)
+        # z_dot_pred = theta_z @ self.model.xi_coefficients
+        # z_next = z + (z_dot_pred / 240.0)
+        # next_state = self.model.decoder(z_next)
+
+        # Parsimonious dynamics inferred from the SINDy model in the coefficient matric
+        z_dot = torch.cat([z[:, [0]] * 0.9017911, z[:, [1]] * 1.7897408], dim=1)
+        z_next = z + (z_dot / 240.0)
         next_state = self.model.decoder(z_next)
+
+
 
         # ---
         return next_state
