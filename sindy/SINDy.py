@@ -1,3 +1,4 @@
+import sys
 import torch
 import numpy as np
 from torch import nn
@@ -76,17 +77,28 @@ class SindyDataset(Dataset):
         return sample
 
 class RoboSINDy(nn.Module):
-    def __init__(self, input_dim, batch_size=32):
+    def __init__(self, input_dim, batch_size=32, latent_dim=2):
         
         super().__init__()
 
         # CONSTANTS
-        self.latent_dim = 2
-        self.num_functions_in_library = 6 # Must set according to the latent_dim!
+        self.latent_dim = latent_dim # can only be 1,2,3
+
+        #set num_functions_in_library according to the latent_dim
+        self.num_functions_in_library = 0
+        if self.latent_dim == 2:
+            self.num_functions_in_library = 6
+        elif self.latent_dim == 3:
+            self.num_functions_in_library = 14
+        elif self.latent_dim == 1:
+            self.num_functions_in_library = 2
+        else:
+            raise ValueError("latent_dim must be 1, 2 or 3")
+        
         self.rec_loss_reg = 1.0
         self.sindy_x_reg = 5e-4
         self.sindy_z_reg = 5e-5
-        self.sparsity_reg = 1e-5
+        self.sparsity_reg = 5e-5
 
 
         self.batch_size = batch_size
@@ -113,6 +125,7 @@ class RoboSINDy(nn.Module):
             nn.Linear(128, input_dim)
         )
 
+
         #xavier initialization
         # for m in self.modules():
         #     if isinstance(m, nn.Linear):
@@ -138,14 +151,37 @@ class RoboSINDy(nn.Module):
         For latent dim 2, theta_z will be of shape (batch_size, 6) with the following columns: 
         [1, z1, z2, z1*z2, z1^2, z2^2]
         """
-        N = z.size(0)
-        z1, z2 = z[:, [0]], z[:, [1]]
-        return torch.cat([
-            torch.ones(N,1,device=z.device),
-            z1, z2,
-            z1*z2,
-            z1**2, z2**2
-        ], dim=1)
+
+        # if block to handle different latent dimensions
+
+        if self.latent_dim == 2:
+            N = z.size(0)
+            z1, z2 = z[:, [0]], z[:, [1]]
+            return torch.cat([
+                torch.ones(N,1,device=z.device),
+                z1, z2,
+                z1*z2,
+                z1**2, z2**2
+            ], dim=1)
+        
+        elif self.latent_dim == 3:
+            N = z.size(0)
+            z1, z2, z3 = z[:, [0]], z[:, [1]], z[:, [2]]
+            return torch.cat([
+                torch.ones(N,1,device=z.device),
+                z1, z2, z3,
+                z1*z2, z1*z3, z2*z3,
+                z1**2, z2**2, z3**2,
+                z1*z2*z3, z1**3, z2**3, z3**3
+            ], dim=1)
+        
+        elif self.latent_dim == 1:
+            N = z.size(0)
+            z1 = z[:, [0]]
+            return torch.cat([
+                torch.ones(N,1,device=z.device),
+                z,
+            ], dim=1)
 
     def forward(self, x):
         """
@@ -201,9 +237,15 @@ class RoboSINDy(nn.Module):
 
             if epoch % 500 == 0:
                 #set xi coefficients that are less that 0.1 to 0 by multiplying a mask
-                mask = torch.abs(self.xi_coefficients) > 0.1
+                mask = torch.abs(self.xi_coefficients) > 0.2
                 self.xi_coefficients.data *= mask.float()
-                print(f"Epoch {epoch}/{num_epochs}, Loss: {loss.item()}")
+                print(f"\rEpoch {epoch}/{num_epochs}  Loss: {loss}")
+            
+
+        # set xi coefficients that are less that 0.1 to 0 by multiplying a mask
+        mask = torch.abs(self.xi_coefficients) > 0.2
+        self.xi_coefficients.data *= mask.float()
+        print(f"Final Loss: {loss.item()}")
 
 def img_space_pushing_cost_function(state, action, target_state):
     """
@@ -241,8 +283,8 @@ class PushingImgSpaceController(object):
         state_dim = env.observation_space.shape[0]
         u_min = torch.from_numpy(env.action_space.low)
         u_max = torch.from_numpy(env.action_space.high)
-        noise_sigma = 0.1 * torch.eye(env.action_space.shape[0])
-        lambda_value = 0.01
+        noise_sigma = 50 * torch.eye(env.action_space.shape[0])
+        lambda_value = 1e-5
         # ---
         self.mppi = MPPI(self._compute_dynamics,
                          self._compute_costs,
@@ -269,15 +311,17 @@ class PushingImgSpaceController(object):
         z = self.model.encoder(x)
 
         # SINDy dynamics
-        # theta_z = self.model.compute_theta(z)
-        # z_dot_pred = theta_z @ self.model.xi_coefficients
-        # z_next = z + (z_dot_pred / 240.0)
+        theta_z = self.model.compute_theta(z)
+        z_dot_pred = theta_z @ self.model.xi_coefficients
+        z_next = z + (z_dot_pred / 240.0)
+        next_state = self.model.decoder(z_next)
+
+        # Parsimonious dynamics inferred from the SINDy model in the coefficient matrix
+        # z_dot = torch.cat([z[:, [0]] * 0.9017911, z[:, [1]] * 1.7897408], dim=1)
+        # z_next = z + (z_dot / 240.0)
         # next_state = self.model.decoder(z_next)
 
-        # Parsimonious dynamics inferred from the SINDy model in the coefficient matric
-        z_dot = torch.cat([z[:, [0]] * 0.9017911, z[:, [1]] * 1.7897408], dim=1)
-        z_next = z + (z_dot / 240.0)
-        next_state = self.model.decoder(z_next)
+        # next_state = torch.zeros_like(x)
 
 
 

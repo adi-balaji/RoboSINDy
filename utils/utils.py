@@ -61,3 +61,9 @@ def evaluate_model_plot(model, traj, norm_tr):
         axes[0][i].imshow(state_gth, cmap='gray')
         axes[1][i].imshow(pred_state_ss, cmap='gray')
         axes[2][i].imshow(pred_state_ms, cmap='gray')
+
+def mask_xi_matrix(xi, thresh=0.5):
+    xi = xi.detach()
+    xi_masked = torch.zeros_like(xi)
+    xi_masked[xi > thresh] = 1
+    return xi_masked * xi

@@ -31,12 +31,16 @@ class PandaImageSpacePushingEnv(gym.Env):
 
     def __init__(self, debug=False, visualizer=None, include_obstacle=False, render_non_push_motions=True,
                  render_every_n_steps=1, camera_heigh=84, camera_width=84, img_width=32, img_height=32, grayscale=False,
-                 done_at_goal=True):
+                 done_at_goal=True, target_pose_vis=None, start_state=None):
         self.debug = debug
         self.visualizer = visualizer
         self.include_obstacle = include_obstacle
         self.render_every_n_steps = render_every_n_steps
         self.done_at_goal = done_at_goal
+
+        # adi edit
+        self.target_pose_vis = target_pose_vis
+        self.start_state = start_state
 
         if debug:
             p.connect(p.GUI)
@@ -158,6 +162,9 @@ class PandaImageSpacePushingEnv(gym.Env):
 
         p.setCollisionFilterGroupMask(self.targetUid, -1, 0, 0)  # remove collisions with targeUid
         p.setCollisionFilterPair(self.pandaUid, self.targetUid, -1, -1, 0)  # remove collision between robot and target
+
+        # print(f"pybullet dt: {p.getPhysicsEngineParameters()['fixedTimeStep']}")
+
 
         # p.changeVisualShape(self.targetUid, -1, rgbaColor=[0.05, 0.95, 0.05, .01])  # Change color for target
 
@@ -417,8 +424,9 @@ class PandaImageSpacePushingEnv(gym.Env):
             object_target_pose_planar = TARGET_POSE_OBSTACLES
         else:
             # free of obstacles
-            object_start_pose_planar = np.array([0.4, 0., np.pi * 0.2])
-            object_target_pose_planar = TARGET_POSE_FREE
+            object_start_pose_planar = self.start_state
+            # print(self.object_target_pose)
+            object_target_pose_planar = self.target_pose_vis
         self.object_start_pose = self._planar_pose_to_world_pose(
             object_start_pose_planar)  # self.cube_pos_distribution.sample()
         self.object_target_pose = self._planar_pose_to_world_pose(object_target_pose_planar)
