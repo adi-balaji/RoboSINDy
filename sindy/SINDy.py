@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from utils.mppi import MPPI
 from utils.panda_pushing_env import TARGET_POSE_FREE, TARGET_POSE_OBSTACLES, OBSTACLE_HALFDIMS, OBSTACLE_CENTRE, BOX_SIZE
+from utils.utils import view_states
 
 class NormalizationTransform:
     def __init__(self, norm_constants, eps=1e-8):
@@ -82,7 +83,7 @@ class RoboSINDy(nn.Module):
         super().__init__()
 
         # CONSTANTS
-        self.latent_dim = latent_dim # can only be 1,2,3
+        self.latent_dim = latent_dim # can only be 1,2,3, 8
 
         #set num_functions_in_library according to the latent_dim
         self.num_functions_in_library = 0
@@ -92,13 +93,15 @@ class RoboSINDy(nn.Module):
             self.num_functions_in_library = 14
         elif self.latent_dim == 1:
             self.num_functions_in_library = 2
+        elif self.latent_dim == 8:
+            self.num_functions_in_library = 50
         else:
             raise ValueError("latent_dim must be 1, 2 or 3")
         
         self.rec_loss_reg = 1.0
         self.sindy_x_reg = 5e-4
         self.sindy_z_reg = 5e-5
-        self.sparsity_reg = 5e-5
+        self.sparsity_reg =1e-5
 
 
         self.batch_size = batch_size
@@ -181,6 +184,23 @@ class RoboSINDy(nn.Module):
             return torch.cat([
                 torch.ones(N,1,device=z.device),
                 z,
+            ], dim=1)
+        
+        elif self.latent_dim == 8:
+            N = z.size(0)
+            z1, z2, z3, z4, z5, z6, z7, z8 = z[:, [0]], z[:, [1]], z[:, [2]], z[:, [3]], z[:, [4]], z[:, [5]], z[:, [6]], z[:, [7]]
+            return torch.cat([
+                torch.ones(N,1,device=z.device),
+                z1, z2, z3, z4, z5, z6, z7, z8,
+                z1*z2*z3*z4*z5*z6*z7*z8,
+                z1**2, z2**2, z3**2, z4**2, z5**2, z6**2, z7**2, z8**2,
+                z1*z2, z1*z3, z1*z4, z1*z5, z1*z6, z1*z7, z1*z8,
+                z2*z3, z2*z4, z2*z5, z2*z6, z2*z7, z2*z8,
+                torch.sin(z1), torch.sin(z2), torch.sin(z3), torch.sin(z4), torch.sin(z5), torch.sin(z6), torch.sin(z7), torch.sin(z8),
+                torch.cos(z1), torch.cos(z2), torch.cos(z3), torch.cos(z4), torch.cos(z5), torch.cos(z6), torch.cos(z7), torch.cos(z8),
+                z1*z2*z3*z4*z5*z6*z7,
+                z1*z2*z3*z4*z5*z6*z8,
+                z1*z2*z3*z4*z5*z7*z8,
             ], dim=1)
 
     def forward(self, x):
@@ -284,7 +304,7 @@ class PushingImgSpaceController(object):
         u_min = torch.from_numpy(env.action_space.low)
         u_max = torch.from_numpy(env.action_space.high)
         noise_sigma = 50 * torch.eye(env.action_space.shape[0])
-        lambda_value = 1e-5
+        lambda_value = 1e-6
         # ---
         self.mppi = MPPI(self._compute_dynamics,
                          self._compute_costs,

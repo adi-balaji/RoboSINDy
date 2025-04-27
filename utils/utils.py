@@ -62,8 +62,18 @@ def evaluate_model_plot(model, traj, norm_tr):
         axes[1][i].imshow(pred_state_ss, cmap='gray')
         axes[2][i].imshow(pred_state_ms, cmap='gray')
 
-def mask_xi_matrix(xi, thresh=0.5):
+def mask_xi_matrix(xi, thresh=0.1):
     xi = xi.detach()
     xi_masked = torch.zeros_like(xi)
     xi_masked[xi > thresh] = 1
     return xi_masked * xi
+
+def write_traj_to_file(trajectory, filename):
+    """
+    Writes a trajectory (a list of [x, y, theta]) to a file.
+    Each trajectory is written on a new line.
+    """
+    
+    with open(filename, 'a') as f:
+        traj_str = str(trajectory)
+        f.write(traj_str + '\n')
