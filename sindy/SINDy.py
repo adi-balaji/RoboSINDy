@@ -301,8 +301,8 @@ class PushingImgSpaceController(object):
         # MPPI Hyperparameters:
         # --- You may need to tune them
         state_dim = env.observation_space.shape[0]
-        u_min = torch.from_numpy(env.action_space.low)
-        u_max = torch.from_numpy(env.action_space.high)
+        u_min = 0.85 * torch.from_numpy(env.action_space.low)
+        u_max = 0.85 * torch.from_numpy(env.action_space.high)
         noise_sigma = 50 * torch.eye(env.action_space.shape[0])
         lambda_value = 1e-6
         # ---

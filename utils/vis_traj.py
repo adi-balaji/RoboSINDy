@@ -2,9 +2,18 @@ import ast
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+import argparse
+import ast
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
-# txt_file = 'sindy_latent3.txt'
-txt_file = 'globoE2C_3dim.txt'
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Visualize trajectories from a text file.")
+parser.add_argument("txt_file", type=str, help="Path to the text file containing trajectories.")
+args = parser.parse_args()
+
+txt_file = args.txt_file
 
 # Load trajectories from file
 trajectories = []
@@ -39,7 +48,7 @@ ax.add_patch(goal_rect)
 
 # Plot all trajectories in light blue
 for traj in trajectories:
-    if (traj[-1, 1] >= 0.05 or traj[-1,1] <= -0.05) or (traj[-1, 0] >= 0.45 or traj[-1,0] <= 0.35):
+    if (traj[-1, 1] >= 0.07 or traj[-1,1] <= -0.03) or (traj[-1, 0] >= 0.46 or traj[-1,0] <= 0.34):
         ax.plot(traj[:, 0], traj[:, 1], color='red', linewidth=1.0)
         ax.plot(traj[:, 0], traj[:, 1], color='lightblue', linewidth=1.0, alpha=0.8)
     else:

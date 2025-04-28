@@ -9,6 +9,7 @@ import math
 import numpy as np
 from tqdm import tqdm
 import argparse
+import cv2
 
 
 # get the path to assets
@@ -29,7 +30,7 @@ class PandaImageSpacePushingEnv(gym.Env):
 
     def __init__(self, debug=False, visualizer=None, include_obstacle=False, render_non_push_motions=True,
                  render_every_n_steps=1, camera_heigh=84, camera_width=84, img_width=32, img_height=32, grayscale=False,
-                 done_at_goal=True, target_pose_vis=None, start_state=None):
+                 done_at_goal=True, target_pose_vis=None, start_state=None, model_label=""):
         self.debug = debug
         self.visualizer = visualizer
         self.include_obstacle = include_obstacle
@@ -39,6 +40,7 @@ class PandaImageSpacePushingEnv(gym.Env):
         # adi edit
         self.target_pose_vis = target_pose_vis
         self.start_state = start_state
+        self.model_label = model_label
 
         if debug:
             p.connect(p.GUI)
@@ -123,8 +125,8 @@ class PandaImageSpacePushingEnv(gym.Env):
         self.object_pose_space = spaces.Box(low=np.array([self.space_limits[0][0], self.space_limits[0][1], -np.pi*0.5], dtype=np.float32),
                                             high=np.array([self.space_limits[1][0], self.space_limits[1][1], np.pi*0.5], dtype=np.float32))
 
-        self.action_space = spaces.Box(low=np.array([-1, -np.pi * 0.5, 0], dtype=np.float32),
-                                       high=np.array([1, np.pi * 0.5, 1], dtype=np.float32))  #
+        self.action_space = spaces.Box(low=np.array([-1.0, -np.pi * 0.5, 0.0], dtype=np.float32),
+                                       high=np.array([1.0, np.pi * 0.5, 1.0], dtype=np.float32))  #
 
 
     def reset(self, object_pose=None, render_reset=True):
@@ -461,7 +463,37 @@ class PandaImageSpacePushingEnv(gym.Env):
                 if self.visualizer is not None:
                     self.visualizer.set_data(rgb_img)
         else:
-            pass
+            if self.is_render_on:
+                rgb_img = self.render_image(camera_pos=[0.55, -0.35, 0.2],
+                                            camera_orn=[0, -40, 0],
+                                            camera_width=self.camera_width,
+                                            camera_height=self.camera_height,
+                                            distance=1.5)
+                rgb_img = rgb_img.transpose(1, 2, 0)
+                rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+
+                _, width, _ = rgb_img.shape
+                text = self.model_label
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 1  
+                color = (0, 0, 0)
+                thickness = 2
+
+                # Calculate the position for the top-right corner
+                text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)[0]
+                text_x = width - text_size[0] - 10  # 10px padding from the right edge
+                text_y = 30  # Position 30px from the top
+
+                # Put the text on the image
+                cv2.putText(rgb_img, text, (text_x, text_y), font, font_scale, color, thickness)
+
+                # Show the image with the label
+                cv2.imshow('Planar Pushing with Robot Arm', rgb_img)
+
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    cv2.destroyAllWindows()
+                    exit(0)
+
 
     def _render_state(self):
         state_img = self.render_image(camera_pos=self.camera_pos_top,

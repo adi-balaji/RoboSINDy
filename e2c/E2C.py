@@ -473,7 +473,7 @@ def img_space_pushing_cost_function(state, action, target_state):
     return cost
 
 
-class PushingImgSpaceController(object):
+class PushingImgSpaceController_E2C(object):
     """
     MPPI-based controller
     Since you implemented MPPI on HW2, here we will give you the MPPI implementation.
@@ -490,8 +490,8 @@ class PushingImgSpaceController(object):
         # MPPI Hyperparameters:
         # --- You may need to tune them
         state_dim = env.observation_space.shape[0]
-        u_min = 0.9*torch.from_numpy(env.action_space.low)
-        u_max = 0.9*torch.from_numpy(env.action_space.high)
+        u_min = 0.85*torch.from_numpy(env.action_space.low)
+        u_max = 0.85*torch.from_numpy(env.action_space.high)
         noise_sigma = 0.1 * torch.eye(env.action_space.shape[0])
         lambda_value = 0.01
         # ---
