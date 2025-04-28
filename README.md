@@ -5,4 +5,4 @@ This code is developed by Advaith Balaji and Julian Skifstad as part of the fina
 
 # Instructions to run this code
 
-Inline comments throughout the notebook with instructions. Demo tbd.
+Run `python3 demo.py` from the root directory of this repository to view 5 planar pushing trials per model.
