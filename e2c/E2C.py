@@ -157,32 +157,55 @@ class StateVariationalEncoder(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_channels = num_channels
-        self.vae = nn.Sequential(
-            nn.Conv2d(num_channels, 4, [5,5], 1, 0, 1),
-            nn.ReLU(), 
-            nn.MaxPool2d([2,2], 2),
-            nn.Conv2d(4, 4, [5,5], 1, 0, 1),
-            nn.ReLU(), 
-            nn.MaxPool2d([2,2], 2),
-            nn.Flatten(),
-            nn.Linear(100,100),
-            nn.ReLU(), 
+        # self.vae = nn.Sequential(
+        #     nn.Conv2d(num_channels, 4, [5,5], 1, 0, 1),
+        #     nn.ReLU(), 
+        #     nn.MaxPool2d([2,2], 2),
+        #     nn.Conv2d(4, 4, [5,5], 1, 0, 1),
+        #     nn.ReLU(), 
+        #     nn.MaxPool2d([2,2], 2),
+        #     nn.Flatten(),
+        #     nn.Linear(100,100),
+        #     nn.ReLU(), 
 
-        )
+        # )
+        # self.lmu = nn.Linear(100,latent_dim)
+        # self.lstd = nn.Linear(100,latent_dim)
+
+        self.conv1 = nn.Conv2d(num_channels, 4, [5,5], 1, 0, 1)
+        self.relu = nn.ReLU()
+        self.mp1 = nn.MaxPool2d([2,2], 2)
+        self.conv2 = nn.Conv2d(4, 4, [5,5], 1, 0, 1)
+        self.mp2 = nn.MaxPool2d([2,2], 2)
+        self.flatten = nn.Flatten()
+        self.l1 = nn.Linear(100,100)
         self.lmu = nn.Linear(100,latent_dim)
         self.lstd = nn.Linear(100,latent_dim)
+
 
     def forward(self, state):
         input_shape = state.shape
         state = state.reshape(-1, self.num_channels, 32, 32)
-        x = self.vae(state)
+        # x = self.vae(state)
+        # mu = self.lmu(x)
+        # log_var = self.lstd(x)
+        x = self.conv1(state)
+        x = self.relu(x)
+        x = self.mp1(x)
+        x = self.conv2(x)
+        x = self.relu(x)
+        x = self.mp2(x)
+        x = self.flatten(x)
+        # print(x.shape)
+        x = self.l1(x)
+        x = self.relu(x)
         mu = self.lmu(x)
         log_var = self.lstd(x)
 
         mu = mu.reshape(*input_shape[:-3], self.latent_dim)
         log_var = log_var.reshape(*input_shape[:-3], self.latent_dim)
         return mu, log_var
-
+    
     def reparameterize(self, mu, logvar):
         eps = np.random.normal()
         sampled_latent_state = mu + eps * logvar
