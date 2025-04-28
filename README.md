@@ -13,4 +13,6 @@ This code is developed by Advaith Balaji and Julian Skifstad as part of the fina
 
 # Instructions to run this code
 
+Run `sh install.sh` to install relevant libraries. Note that numpy version `1.24.6` or above is required.
+
 Run `python demo.py` from the root directory of this repository to view 3 planar pushing trials per model.
