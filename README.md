@@ -5,4 +5,4 @@ This code is developed by Advaith Balaji and Julian Skifstad as part of the fina
 
 # Instructions to run this code
 
-Text here
+Inline comments throughout the notebook with instructions. Demo tbd.
