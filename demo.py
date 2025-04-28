@@ -225,6 +225,7 @@ def main():
             goal_reached = goal_distance < BOX_SIZE/1.5
             if done or goal_reached:
                 break
+        env.close()
 
     ##################################################################################################################################
 
@@ -265,6 +266,7 @@ def main():
             goal_reached = goal_distance < BOX_SIZE/1.5
             if done or goal_reached:
                 break
+        env.close()
 
     #####################################################################################################################################################
 
@@ -305,6 +307,7 @@ def main():
             goal_reached = goal_distance < BOX_SIZE/1.5
             if done or goal_reached:
                 break
+        env.close()
 
 
 
@@ -347,6 +350,7 @@ def main():
             goal_reached = goal_distance < BOX_SIZE/1.5
             if done or goal_reached:
                 break
+        env.close()
 
     #####################################################################################################################################################
 
