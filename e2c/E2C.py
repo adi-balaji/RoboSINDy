@@ -1,7 +1,7 @@
 """
 Originally adapted from HW5
 
-Embed to Control (E2C) Implementation
+Implementation of RoboE2C and GloboE2C, variations of the Embed-to-Control (E2C) Framework 
 
 """
 import pdb
@@ -109,8 +109,7 @@ class VAELoss(nn.Module):
         return loss
 
 
-# TODO: change to ELBO
-class MultiStepLoss(nn.Module): 
+class RoboE2CLoss(nn.Module): 
     def __init__(self, state_loss_fn, latent_loss_fn, alpha=0.1):
         super().__init__()
         self.state_loss = state_loss_fn
@@ -118,239 +117,100 @@ class MultiStepLoss(nn.Module):
         self.alpha = alpha
 
     def forward(self, model, states, actions):
-        """
-        Compute the multi-step loss resultant of multi-querying the model from (state, action) and comparing the predictions with targets.
-        Here the loss is computed based on 3 terms:
-         - reconstruction loss: enforces good encoding and reconstruction of the states (no dynamics).
-         - latent loss: enforces dynamics on latent space by matching the state encodings with the dynamics on latent space.
-         - prediction loss: enforces reconstruction of the predicted states by matching the predictions with the targets.
-
-         :param model: <nn.Module> model to be trained.
-         :param states: <torch.tensor> tensor of shape (batch_size, traj_size + 1, state_size)
-         :param actions: <torch.tensor> tensor of shape (batch_size, traj_size, action_size)
-        """
-        # compute reconstruction loss -- compares the encoded-decoded states with the original states
+        # compute reconstruction loss
         rec_loss = 0.
-        # --- Your code here
         latent_values = model.encode(states)
         decoded_states = model.decode(latent_values)
-
-        # mse = 0.0
-        # for i in range(states.shape[1]):
-        #   mse += self.state_loss(decoded_states[:,i], states[:,i])
-        # rec_loss = mse / float(states.shape[1])
         rec_loss = self.state_loss(decoded_states, states)
 
 
-        # ---
-        # propagate dynamics on latent space as well as reconstructed states
+        # compute prediction loss and store latent predictions 
         pred_latent_values = []
         pred_states = []
-        prev_z = latent_values[:, 0, :]  # get initial latent value
-        prev_state = states[:, 0, :]  # get initial state value
+        prev_z = latent_values[:, 0, :]
+        prev_state = states[:, 0, :]
         for t in range(actions.shape[1]):
             next_z = None
             next_state = None
-            # --- Your code here
             next_z = model.latent_dynamics(prev_z, actions[:,t])
             pred_latent_values.append(next_z)
+            
             next_state = model(prev_state, actions[:,t])
             pred_states.append(next_state)
 
-            # ---
             prev_z = next_z
             prev_state = next_state
         pred_states = torch.stack(pred_states, dim=1)
         pred_latent_values = torch.stack(pred_latent_values, dim=1)
-        # compute prediction loss -- compares predicted state values with the given states
         pred_loss = 0.
-        # --- Your code here
-        # mse = 0.0
-        # for i in range(1, states.shape[1]):
-        #   mse += self.state_loss(pred_states[:,i-1], states[:,i])
-        # pred_loss = mse / float(states.shape[1]-1)
         pred_loss = self.state_loss(pred_states, states[:,1:])
-        # ---
 
-        # compute latent loss -- compares predicted latent values with the encoded latent values for states
+        # compute latent loss
         lat_loss = 0.
-        # --- Your code here
-        # mse = 0.0
-        # for i in range(1, states.shape[1]):
-        #   mse += self.latent_loss(pred_latent_values[:,i-1], latent_values[:,i])
-        #   # mse += self.state_loss(decoded_states[i], states[i])
-        # lat_loss = mse / float(states.shape[1]-1)
-
         lat_loss = self.latent_loss(pred_latent_values, latent_values[:,1:])
-        # ---
+        loss = rec_loss + pred_loss + self.alpha * lat_loss
 
-        multi_step_loss = rec_loss + pred_loss + self.alpha * lat_loss
-
-        return multi_step_loss
-
-
-class StateEncoder(nn.Module):
-    """
-    Embeds the state into a latent space.
-    State shape: (..., num_channels, 32, 32)
-    latent shape: (..., latent_dim)
-    Check the notebook for more details about the architecture.
-    """
-
-    def __init__(self, latent_dim, num_channels=3):
-        super().__init__()
-        self.latent_dim = latent_dim
-        self.num_channels = num_channels
-        # --- Your code here
-        self.conv1 = nn.Conv2d(num_channels, 4, [5,5], 1, 0, 1)
-        self.relu = nn.ReLU()
-        self.mp1 = nn.MaxPool2d([2,2], 2)
-        self.conv2 = nn.Conv2d(4, 4, [5,5], 1, 0, 1)
-        self.mp2 = nn.MaxPool2d([2,2], 2)
-        self.flatten = nn.Flatten()
-        self.l1 = nn.Linear(100,100)
-        self.l2 = nn.Linear(100,latent_dim)
-
-        # ---
-
-    def forward(self, state):
-        """
-        :param state: <torch.Tensor> of shape (..., num_channels, 32, 32)
-        :return latent_state: <torch.Tensor> of shape (..., latent_dim)
-        """
-        latent_state = None
-        input_shape = state.shape
-        state = state.reshape(-1, self.num_channels, 32, 32)
-        # --- Your code here
-        x = self.conv1(state)
-        x = self.relu(x)
-        x = self.mp1(x)
-        x = self.conv2(x)
-        x = self.relu(x)
-        x = self.mp2(x)
-        x = self.flatten(x)
-        x = self.l1(x)
-        x = self.relu(x)
-        latent_state = self.l2(x)
-
-        # ---
-        # convert to original multi-batch shape
-        latent_state = latent_state.reshape(*input_shape[:-3], self.latent_dim)
-        return latent_state
-
+        return loss
 
 class StateVariationalEncoder(nn.Module):
-    """
-    Embeds the state into a latent space.
-    State shape: (..., num_channels, 32, 32)
-    latent shape: (..., latent_dim)
-    Check the notebook for more details about the architecture.
-    """
-
     def __init__(self, latent_dim, num_channels=3):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_channels = num_channels
-        # --- Your code here
-        # self.kernel1 = torch.randn((out_channels, in_channels,  kernel_size, kernel_size))
-        self.conv1 = nn.Conv2d(num_channels, 4, [5,5], 1, 0, 1)
-        self.relu = nn.ReLU()
-        self.mp1 = nn.MaxPool2d([2,2], 2)
-        self.conv2 = nn.Conv2d(4, 4, [5,5], 1, 0, 1)
-        self.mp2 = nn.MaxPool2d([2,2], 2)
-        self.flatten = nn.Flatten()
-        self.l1 = nn.Linear(100,100)
+        self.vae = nn.Sequential(
+            nn.Conv2d(num_channels, 4, [5,5], 1, 0, 1),
+            nn.ReLU(), 
+            nn.MaxPool2d([2,2], 2),
+            nn.Conv2d(4, 4, [5,5], 1, 0, 1),
+            nn.ReLU(), 
+            nn.MaxPool2d([2,2], 2),
+            nn.Flatten(),
+            nn.Linear(100,100),
+            nn.ReLU(), 
+
+        )
         self.lmu = nn.Linear(100,latent_dim)
         self.lstd = nn.Linear(100,latent_dim)
 
-        # ---
-
     def forward(self, state):
-        """
-        :param state: <torch.Tensor> of shape (..., num_channels, 32, 32)
-        :return: 2 <torch.Tensor>
-          :mu: <torch.Tensor> of shape (..., latent_dim)
-          :log_var: <torch.Tensor> of shape (..., latent_dim)
-        """
-        mu = None
-        log_var = None
         input_shape = state.shape
         state = state.reshape(-1, self.num_channels, 32, 32)
-        # --- Your code here
-        x = self.conv1(state)
-        x = self.relu(x)
-        x = self.mp1(x)
-        x = self.conv2(x)
-        x = self.relu(x)
-        x = self.mp2(x)
-        x = self.flatten(x)
-        # print(x.shape)
-        x = self.l1(x)
-        x = self.relu(x)
+        x = self.vae(state)
         mu = self.lmu(x)
         log_var = self.lstd(x)
 
-
-        # ---
-        # convert to original multi-batch shape
         mu = mu.reshape(*input_shape[:-3], self.latent_dim)
         log_var = log_var.reshape(*input_shape[:-3], self.latent_dim)
         return mu, log_var
 
     def reparameterize(self, mu, logvar):
-        """
-        Reparametrization trick to sample from N(mu, std) from N(0,1)
-        :param mu: <torch.Tensor> of shape (..., latent_dim)
-        :param logvar: <torch.Tensor> of shape (..., latent_dim)
-        :return: <torch.Tensor> of shape (..., latent_dim)
-        """
-        sampled_latent_state = None
-        # --- Your code here
         eps = np.random.normal()
         sampled_latent_state = mu + eps * logvar
 
-        # ---
         return sampled_latent_state
 
 
 class StateDecoder(nn.Module):
-    """
-    Reconstructs the state from a latent space.
-    Check the notebook for more details about the architecture.
-    """
-
     def __init__(self, latent_dim, num_channels=3):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_channels = num_channels
-        # --- Your code here
         self.l1 = nn.Linear(latent_dim, 500)
         self.relu = nn.ReLU()
         self.l2 = nn.Linear(500,500)
         self.l3 = nn.Linear(500, num_channels * 32 * 32)
 
 
-        # ---
 
     def forward(self, latent_state):
-        """
-        :param latent_state: <torch.Tensor> of shape (..., latent_dim)
-        :return decoded_state: <torch.Tensor> of shape (..., num_channels, 32, 32)
-        """
-        decoded_state = None
         input_shape = latent_state.shape
         latent_state = latent_state.reshape(-1, self.latent_dim)
 
-        # --- Your code here
         x = self.l1(latent_state)
         x = self.relu(x)
         x = self.l2(x)
         x = self.relu(x)
         decoded_state = self.l3(x)
-
-
-
-        # ---
 
         decoded_state = decoded_state.reshape(*input_shape[:-1], self.num_channels, 32, 32)
 
@@ -359,7 +219,7 @@ class StateDecoder(nn.Module):
 
 class StateVAE(nn.Module):
     """
-    State AutoEncoder
+    State Variational Autoencoder
     """
 
     def __init__(self, latent_dim, num_channels=3):
@@ -370,63 +230,35 @@ class StateVAE(nn.Module):
         self.decoder = StateDecoder(latent_dim, num_channels)
 
     def forward(self, state):
-        """
-        :param state: <torch.Tensor> of shape (..., num_channels, 32, 32)
-        :return:
-            reconstructed_state: <torch.Tensor> of shape (..., num_channels, 32, 32)
-            mu: <torch.Tensor> of shape (..., latent_dim)
-            log_var: <torch.Tensor> of shape (..., latent_dim)
-            latent_state: <torch.Tensor> of shape (..., latent_dim)
-        """
-        reconstructed_state = None  # decoded states from the latent_state
-        mu, log_var = None, None  # mean and log variance obtained from encoding state
-        latent_state = None  # sample from the latent space feeded to the decoder
-        # --- Your code here
         mu, log_var = self.encoder(state)
         latent_state = self.reparameterize(mu,log_var)
         reconstructed_state = self.decode(latent_state)
 
-        # ---
         return reconstructed_state, mu, log_var, latent_state
 
     def encode(self, state):
-        """
-        :param state: <torch.Tensor> of shape (..., num_channels, 32, 32)
-        :return: <torch.Tensor> of shape (..., latent_dim)
-        """
-        latent_state = None
-        # --- Your code here
         mu,log_var= self.encoder(state)
         latent_state = self.reparameterize(mu,log_var)
 
-        # ---
         return latent_state
 
     def decode(self, latent_state):
-        """
-        :param latent_state: <torch.Tensor> of shape (..., latent_dim)
-        :return: <torch.Tensor> of shape (..., num_channels, 32, 32)
-        """
-        reconstructed_state = None
-        # --- Your code here
         reconstructed_state = self.decoder(latent_state)
 
-        # ---
         return reconstructed_state
 
     def reparameterize(self, mu, logvar):
         return self.encoder.reparameterize(mu, logvar)
 
 
-class LatentDynamicsModel(nn.Module):
+class RoboE2C(nn.Module):
 
     def __init__(self, latent_dim, action_dim, num_channels=3):
         super().__init__()
         self.latent_dim = latent_dim
         self.action_dim = action_dim
         self.num_channels = num_channels
-        self.encoder = StateEncoder(latent_dim, num_channels)
-        self.decoder = StateDecoder(latent_dim, num_channels)
+        self.vae = StateVAE(latent_dim, num_channels)
         self.latent_dynamics_model = nn.Sequential(
           nn.Linear(latent_dim+action_dim, 200),
           nn.ReLU(),
@@ -434,6 +266,10 @@ class LatentDynamicsModel(nn.Module):
           nn.ReLU(),
           nn.Linear(200, 2*latent_dim + latent_dim*action_dim + latent_dim)
         )
+        self.A = None
+        self.B = None
+        self.b = None
+
     
 
         # ---
@@ -461,49 +297,120 @@ class LatentDynamicsModel(nn.Module):
         a1_end = self.latent_dim
         a2_end = 2*self.latent_dim
         b_end = a2_end + self.latent_dim*self.action_dim
-        A = torch.eye(self.latent_dim) + torch.bmm(flattened_coeffs[:,:a1_end].unsqueeze(), flattened_coeffs[:,a1_end:a2_end].unsqueeze().transpose(-2,-1))
+        A = torch.eye(self.latent_dim) + torch.bmm(flattened_coeffs[:,:a1_end].unsqueeze(-1), flattened_coeffs[:,a1_end:a2_end].unsqueeze(-1).transpose(-2,-1))
         B = torch.reshape(flattened_coeffs[:,a2_end:b_end], [flattened_coeffs.shape[0], self.latent_dim, self.action_dim])
         b = flattened_coeffs[:,b_end:]
 
         return A, B, b
 
     def encode(self, state):
-        """
-        Encode a state into the latent space
-        :param state: torch tensor of shape (..., num_channels, 32, 32)
-        :return: latent_state: torch tensor of shape (..., latent_dim)
-        """
-        latent_state = None
-        # --- Your code here
-        latent_state = self.encoder(state)
+        latent_state = self.vae.encode(state)
 
-        # ---
         return latent_state
 
     def decode(self, latent_state):
-        """
-        Decode a latent state into the original space.
-        :param latent_state: torch tensor of shape (..., latent_dim)
-        :return: state: torch tensor of shape (..., num_channels, 32, 32)
-        """
-        state = None
-        # --- Your code here
-        state = self.decoder(latent_state)
+        state = self.vae.decode(latent_state)
 
-        # ---
         return state
 
     def latent_dynamics(self, latent_state, action):
         """
         z(t+1) = A@z(t) + B@a(t) + b
         """
-        next_latent_state = None
-        # --- Your code here
         linear_terms_flattened = self.latent_dynamics_model(torch.cat([latent_state, action], -1))
-        A, B, b = self.unwrap_linear_coeffs(linear_terms_flattened)
-        next_latent_state = torch.bmm(A, latent_state) + torch.bmm(B, action) + b
-        # ---
+        self.A, self.B, self.b = self.unwrap_linear_coeffs(linear_terms_flattened)
+        
+        first_add = torch.bmm(self.A, latent_state.unsqueeze(-1)) + torch.bmm(self.B, action.unsqueeze(-1))
+        next_latent_state =  first_add.squeeze(-1) + self.b
+
         return next_latent_state
+
+
+class GloboE2C(nn.Module):
+
+    def __init__(self, latent_dim, action_dim, num_channels=3):
+        super().__init__()
+        self.latent_dim = latent_dim
+        self.action_dim = action_dim
+        self.num_channels = num_channels
+        self.vae = StateVAE(latent_dim, num_channels)
+        self.matrix_generator = nn.Sequential(
+          nn.Linear(latent_dim+action_dim, 200),
+          nn.ReLU(),
+          nn.Linear(200, 200),
+          nn.ReLU(),
+          nn.Linear(200, 2*latent_dim + latent_dim*action_dim + latent_dim)
+        )
+        self.A = None
+        self.B = None
+        self.b = None
+
+    
+
+        # ---
+
+    def forward(self, state, action):
+        """
+        Compute next_state resultant of applying the provided action to provided state
+        :param state: torch tensor of shape (..., num_channels, 32, 32)
+        :param action: torch tensor of shape (..., action_dim)
+        :return: next_state: torch tensor of shape (..., num_channels, 32, 32)
+        """
+        next_state = None
+        # --- Your code here
+        latent_state = self.encode(state)
+        next_latent_state = self.latent_dynamics(latent_state, action)
+        next_state = self.decode(next_latent_state)
+
+        # ---
+        return next_state
+
+    def unwrap_linear_coeffs(self, flattened_coeffs):
+        """
+        :param next_latent_state: torch tensor of shap (..., 2*latent_dim + latent_dim*action_dim + latent_dim)
+        """
+        a1_end = self.latent_dim
+        a2_end = 2*self.latent_dim
+        b_end = a2_end + self.latent_dim*self.action_dim
+        A = torch.eye(self.latent_dim) + torch.bmm(flattened_coeffs[:,:a1_end].unsqueeze(-1), flattened_coeffs[:,a1_end:a2_end].unsqueeze(-1).transpose(-2,-1))
+        B = torch.reshape(flattened_coeffs[:,a2_end:b_end], [flattened_coeffs.shape[0], self.latent_dim, self.action_dim])
+        b = flattened_coeffs[:,b_end:]
+
+        return A, B, b
+
+    def encode(self, state):
+        latent_state = self.vae.encode(state)
+
+        return latent_state
+
+    def decode(self, latent_state):
+        state = self.vae.decoder(latent_state)
+
+        return state
+
+    def latent_dynamics(self, latent_state, action):
+        """
+        z(t+1) = A@z(t) + B@a(t) + b
+        """
+        state_one = torch.ones_like(latent_state)
+        action_one = torch.ones_like(action)
+        linear_terms_flattened = self.matrix_generator(torch.cat([state_one, action_one], -1))
+        A, B, b = self.unwrap_linear_coeffs(linear_terms_flattened)
+
+        
+        first_add = torch.bmm(A, latent_state.unsqueeze(-1)) + torch.bmm(B, action.unsqueeze(-1))
+        next_latent_state =  first_add.squeeze(-1) + b
+
+        # Save linear coefficients
+        self.A = A.mean(0)
+        self.B = B.mean(0)
+        self.b = b.mean(0)
+
+        return next_latent_state
+
+
+
+
 
 
 def latent_space_pushing_cost_function(latent_state, action, target_latent_state):
@@ -560,8 +467,8 @@ class PushingImgSpaceController(object):
         # MPPI Hyperparameters:
         # --- You may need to tune them
         state_dim = env.observation_space.shape[0]
-        u_min = torch.from_numpy(env.action_space.low)
-        u_max = torch.from_numpy(env.action_space.high)
+        u_min = 0.9*torch.from_numpy(env.action_space.low)
+        u_max = 0.9*torch.from_numpy(env.action_space.high)
         noise_sigma = 0.1 * torch.eye(env.action_space.shape[0])
         lambda_value = 0.01
         # ---
