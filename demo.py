@@ -105,17 +105,18 @@ def main():
     globoe2c_model_path = current_working_dir + "/trained_models/global_e2c_3dim_v2.pt"
     roboe2c_path = current_working_dir + "/trained_models/robo_e2c_3dim_v2.pt"
     num_steps_max = 15
+    sleep_time = 0.1
 
     start_states = [
         np.array([0.4, 0.0, 0.0]),
-        # np.array([0.4, 0.3, -np.pi/2]),
+        np.array([0.4, 0.3, -np.pi/2]),
         np.array([0.3, 0.3, np.pi]),
         # np.array([0.6, 0.1, -np.pi/4]),
         # np.array([0.4, 0.3, -np.pi/2]),
     ]
     target_states = [
         np.array([0.7, -0.0, 0.0]),
-        # np.array([0.4, -0.0, 0.0]),
+        np.array([0.4, -0.0, 0.0]),
         np.array([0.0, 0.3, 0.0]),
         # np.array([0.8, -0.0, 0.0]),
         # np.array([0.3, -0.1, -np.pi/2]),
@@ -228,7 +229,7 @@ def main():
     ##################################################################################################################################
 
     #breathe!! stop and smell the flowers!
-    time.sleep(2)
+    time.sleep(sleep_time)
 
     ################# LOAD SINDY LATENT 3 MODEL AND RUN DEMO ####################
 
@@ -268,7 +269,7 @@ def main():
     #####################################################################################################################################################
 
     #breathe!! stop and smell the flowers!
-    time.sleep(2)
+    time.sleep(sleep_time)
 
     ########################################### LOAD GLOBOE2C MODEL AND RUN DEMO ###################################################################
 
@@ -310,7 +311,7 @@ def main():
     #####################################################################################################################################################
 
     #breathe!! stop and smell the flowers!
-    time.sleep(2)    
+    time.sleep(sleep_time)  
 
     ########################################### LOAD ROBOE2C MODEL AND RUN DEMO ###################################################################
 

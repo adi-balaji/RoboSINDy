@@ -179,7 +179,7 @@ class PandaImageSpacePushingEnv(gym.Env):
         is_action_valid = self.check_action_valid(action)
         if not is_action_valid:
             # raise AttributeError(f'Action {action} is not valid. Make sure you provide an action within the action space limits.')
-            print(f'Action {action} is not valid. Defaulting to zero action.')
+            print(f'Action {action} is out of bounds. Retrying..')
             action = np.array([0., 0., 0.])
         self.episode_step_counter += 1
         # Enable smooth motion of the robot arm
@@ -461,7 +461,7 @@ class PandaImageSpacePushingEnv(gym.Env):
                                             camera_height=self.camera_height,
                                             distance=1.5)
                 rgb_img = rgb_img.transpose(1, 2, 0)
-                self.frames.append(rgb_img)
+                # self.frames.append(rgb_img)
                 if self.visualizer is not None:
                     self.visualizer.set_data(rgb_img)
         else:
