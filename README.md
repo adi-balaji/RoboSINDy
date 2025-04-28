@@ -1,7 +1,7 @@
 # RoboSINDy
 
 <p align="center">
-    <img src="robosindy_gif.gif" alt="Demo GIF" />
+     <img src="robosindy_gif.gif" alt="Demo GIF" width="500" />
 </p>
 
 <p align="center">
