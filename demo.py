@@ -108,17 +108,17 @@ def main():
 
     start_states = [
         np.array([0.4, 0.0, 0.0]),
-        np.array([0.4, 0.3, -np.pi/2]),
+        # np.array([0.4, 0.3, -np.pi/2]),
         np.array([0.3, 0.3, np.pi]),
-        np.array([0.6, 0.1, -np.pi/4]),
-        np.array([0.4, 0.3, -np.pi/2]),
+        # np.array([0.6, 0.1, -np.pi/4]),
+        # np.array([0.4, 0.3, -np.pi/2]),
     ]
     target_states = [
         np.array([0.7, -0.0, 0.0]),
-        np.array([0.4, -0.0, 0.0]),
+        # np.array([0.4, -0.0, 0.0]),
         np.array([0.0, 0.3, 0.0]),
-        np.array([0.8, -0.0, 0.0]),
-        np.array([0.3, -0.1, -np.pi/2]),
+        # np.array([0.8, -0.0, 0.0]),
+        # np.array([0.3, -0.1, -np.pi/2]),
     ]
     
     #########################################################
@@ -203,7 +203,7 @@ def main():
         target_state = target_states[i]
 
         
-        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=2, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="RoboSINDy 2D")
+        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=5, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="RoboSINDy 2D")
         env.object_target_pose = env._planar_pose_to_world_pose(target_state)
         state_0 = env.reset()
         controller = PushingImgSpaceController(env, sindy_latent2_model, img_space_pushing_cost_function, normalization_constants, num_samples=200, horizon=20)
@@ -243,7 +243,7 @@ def main():
         target_state = target_states[i]
 
         
-        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=2, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="RoboSINDy 3D")
+        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=5, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="RoboSINDy 3D")
         env.object_target_pose = env._planar_pose_to_world_pose(target_state)
         state_0 = env.reset()
         controller = PushingImgSpaceController(env, sindy_latent2_model, img_space_pushing_cost_function, normalization_constants, num_samples=200, horizon=20)
@@ -283,7 +283,7 @@ def main():
         target_state = target_states[i]
 
         
-        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=2, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="GloboE2C")
+        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=5, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="GloboE2C")
         env.object_target_pose = env._planar_pose_to_world_pose(target_state)
         state_0 = env.reset()
         controller = PushingImgSpaceController_E2C(env, globo_model, img_space_pushing_cost_function, norm_constants, num_samples=200, horizon=20)
@@ -318,14 +318,14 @@ def main():
 
     roboe2c_model.load_state_dict(torch.load(roboe2c_path,weights_only=True))
 
-    train_loader,val_loader,norm_constants = process_data(data_npy, batch_size)
+    # train_loader,val_loader,norm_constants = process_data(data_npy, batch_size)
     
     for i in range(len(start_states)):
         start_state = start_states[i]
         target_state = target_states[i]
 
         
-        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=2, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="RoboE2C")
+        env = PandaImageSpacePushingEnv(visualizer=None, render_non_push_motions=False,  camera_heigh=800, camera_width=800, render_every_n_steps=5, grayscale=True, target_pose_vis=target_state, start_state=start_state, model_label="RoboE2C")
         env.object_target_pose = env._planar_pose_to_world_pose(target_state)
         state_0 = env.reset()
         controller = PushingImgSpaceController_E2C(env, roboe2c_model, img_space_pushing_cost_function, norm_constants, num_samples=200, horizon=20)

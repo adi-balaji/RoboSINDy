@@ -178,7 +178,9 @@ class PandaImageSpacePushingEnv(gym.Env):
         # check that the action is valid
         is_action_valid = self.check_action_valid(action)
         if not is_action_valid:
-            raise AttributeError(f'Action {action} is not valid. Make sure you provide an action within the action space limits.')
+            # raise AttributeError(f'Action {action} is not valid. Make sure you provide an action within the action space limits.')
+            print(f'Action {action} is not valid. Defaulting to zero action.')
+            action = np.array([0., 0., 0.])
         self.episode_step_counter += 1
         # Enable smooth motion of the robot arm
         p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
