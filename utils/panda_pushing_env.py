@@ -16,8 +16,6 @@ import argparse
 hw_dir = os.path.dirname(os.path.abspath(__file__))
 assets_dir = os.path.join(hw_dir, 'assets')
 
-print(f'Assets dir: {assets_dir}')
-
 
 BOX_SIZE = 0.1
 
@@ -404,7 +402,7 @@ class PandaImageSpacePushingEnv(gym.Env):
         rgb_array = np.array(px, dtype=np.uint8)
         rgb_array = np.reshape(rgb_array, (camera_height, camera_width, 4))
         rgb_array = rgb_array[:, :, :3]
-        rgb_array = np.moveaxis(rgb_array, [0, 1, 2], [1, 2, 0])
+        rgb_array = np.moveaxis(rgb_array, [0, 1, 2], [1, 2, 0]) ########################################## ALERT!!!!!!!!!!!!! EDITED BY ADI ########################################
         return rgb_array
 
     def _debug_step(self):
